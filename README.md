@@ -50,12 +50,15 @@ Correct, you solved hello4!
 
 ### Spaceship
 
+```
+% go run main.go "get spaceship"
+```
+
 See the [task](./spaceship/spaceship.md).
 
 Manually solved the first one (answer `31619`), visiting the points in order without real regard for controlling velocity.  Only solves about half.  Will need much better solutions.
 
 Set up harness to pull each test, try to solve, then submit solution if we got one.
-
 
 ```
 % go run main.go "get spaceship1"
@@ -71,8 +74,16 @@ Correct, you solved spaceship1 with a score of 5!
 
 ### Lambdaman
 
+```
+% go run main.go "get lambdaman"
+```
+
 See the [task](./lambdaman/lambdaman.md).
 
 ### 3d
+
+```
+% go run main.go "get 3d"
+```
 
 See the [task](./3d/3d.md).
