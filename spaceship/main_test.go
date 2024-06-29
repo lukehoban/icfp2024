@@ -40,5 +40,4 @@ func Test1(t *testing.T) {
 
 	actions := Walk(points)
 	assert.Equal(t, []int{3, 1, 6, 1, 9}, actions)
-
 }

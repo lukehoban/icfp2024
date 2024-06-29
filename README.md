@@ -7,3 +7,7 @@ Receive: SB%,,/}!.$}7%,#/-%}4/}4(%}M#(//,}/&}4(%}</5.$}P!2)!",%_~~<%&/2%}4!+).'}
 
 
 `solve language_test 4w3s0m3` -> `Correct, you solved hello4!`
+
+```
+solve spaceship1 31619
+```
