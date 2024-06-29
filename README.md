@@ -6,7 +6,7 @@ Resources:
 * https://icfpcontest2024.github.io/task.html
 * https://icfpcontest2024.github.io/scoreboard.html
 
-This is work in progress for team __Team Cup<T>__.  
+This is work in progress for team __Team Cup&lt;T&gt;__.  
 
 ## Notes
 
