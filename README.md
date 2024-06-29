@@ -87,3 +87,11 @@ See the [task](./lambdaman/lambdaman.md).
 ```
 
 See the [task](./3d/3d.md).
+
+### 3d
+
+```
+% go run main.go "get efficiency"
+```
+
+See the [task](./efficiency/efficiency.md)
