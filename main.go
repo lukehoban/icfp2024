@@ -10,7 +10,6 @@ import (
 func main() {
 	s := os.Args[1]
 	tok := icfp.StringToToken(s)
-	// fmt.Printf("Sending: %s\n", s)
 	ret, err := icfp.CommunicateToken(string(tok))
 	if err != nil {
 		panic(err)
@@ -21,6 +20,6 @@ func main() {
 		fmt.Printf("WARNING - didn't use all input! %v\n", rest)
 	}
 
-	res := icfp.Eval(expr, map[int]icfp.Expr{})
+	res := icfp.Eval(expr)
 	fmt.Printf("%v", res)
 }

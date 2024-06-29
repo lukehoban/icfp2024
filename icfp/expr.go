@@ -29,7 +29,6 @@ type If struct {
 type Lambda struct {
 	Param int64
 	Body  Expr
-	Env   map[int]Expr
 }
 type Var struct {
 	v int64
@@ -129,75 +128,74 @@ func CombineToExpr(exprs []Expr) (Expr, []Expr) {
 	}
 }
 
-func Eval(expr Expr, env map[int]Expr) Expr {
-	// fmt.Printf("Evaluating %T %#v\n", expr, expr)
+func Eval(expr Expr) Expr {
 	switch v := expr.(type) {
 	case Integer, Boolean, String:
 		return v
 	case If:
-		test := Eval(v.Test, env).(Boolean)
+		test := Eval(v.Test).(Boolean)
 		if test {
-			return Eval(v.Then, env)
+			return Eval(v.Then)
 		} else {
-			return Eval(v.Else, env)
+			return Eval(v.Else)
 		}
 	case Binop:
 		switch v.Op {
 		case "=":
-			left := Eval(v.Left, env)
-			right := Eval(v.Right, env)
+			left := Eval(v.Left)
+			right := Eval(v.Right)
 			return Boolean(left == right)
 		case "$":
-			lambda := Eval(v.Left, env).(Lambda)
+			lambda := Eval(v.Left).(Lambda)
 			reduced := Substitute(lambda.Body, lambda.Param, v.Right)
-			return Eval(reduced, env)
+			return Eval(reduced)
 		case "T":
-			left := Eval(v.Left, env).(Integer)
-			right := Eval(v.Right, env).(String)
+			left := Eval(v.Left).(Integer)
+			right := Eval(v.Right).(String)
 			return right[0:left]
 		case "D":
-			left := Eval(v.Left, env).(Integer)
-			right := Eval(v.Right, env).(String)
+			left := Eval(v.Left).(Integer)
+			right := Eval(v.Right).(String)
 			return right[left:]
 		case ".":
-			left := Eval(v.Left, env).(String)
-			right := Eval(v.Right, env).(String)
+			left := Eval(v.Left).(String)
+			right := Eval(v.Right).(String)
 			return left + right
 		case "&":
-			left := Eval(v.Left, env).(Boolean)
-			right := Eval(v.Right, env).(Boolean)
+			left := Eval(v.Left).(Boolean)
+			right := Eval(v.Right).(Boolean)
 			return Boolean(bool(left) && bool(right))
 		case "|":
-			left := Eval(v.Left, env).(Boolean)
-			right := Eval(v.Right, env).(Boolean)
+			left := Eval(v.Left).(Boolean)
+			right := Eval(v.Right).(Boolean)
 			return Boolean(bool(left) || bool(right))
 		case "<":
-			left := Eval(v.Left, env).(Integer)
-			right := Eval(v.Right, env).(Integer)
+			left := Eval(v.Left).(Integer)
+			right := Eval(v.Right).(Integer)
 			return Boolean(left < right)
 		case ">":
-			left := Eval(v.Left, env).(Integer)
-			right := Eval(v.Right, env).(Integer)
+			left := Eval(v.Left).(Integer)
+			right := Eval(v.Right).(Integer)
 			return Boolean(left > right)
 		case "%":
-			left := Eval(v.Left, env).(Integer)
-			right := Eval(v.Right, env).(Integer)
+			left := Eval(v.Left).(Integer)
+			right := Eval(v.Right).(Integer)
 			return Integer(left % right)
 		case "/":
-			left := Eval(v.Left, env).(Integer)
-			right := Eval(v.Right, env).(Integer)
+			left := Eval(v.Left).(Integer)
+			right := Eval(v.Right).(Integer)
 			return Integer(left / right)
 		case "*":
-			left := Eval(v.Left, env).(Integer)
-			right := Eval(v.Right, env).(Integer)
+			left := Eval(v.Left).(Integer)
+			right := Eval(v.Right).(Integer)
 			return Integer(left * right)
 		case "+":
-			left := Eval(v.Left, env).(Integer)
-			right := Eval(v.Right, env).(Integer)
+			left := Eval(v.Left).(Integer)
+			right := Eval(v.Right).(Integer)
 			return Integer(left + right)
 		case "-":
-			left := Eval(v.Left, env).(Integer)
-			right := Eval(v.Right, env).(Integer)
+			left := Eval(v.Left).(Integer)
+			right := Eval(v.Right).(Integer)
 			return Integer(left - right)
 		default:
 			panic(fmt.Sprintf("Unknown binop: %s", v.Op))
@@ -205,13 +203,13 @@ func Eval(expr Expr, env map[int]Expr) Expr {
 	case Unop:
 		switch v.Op {
 		case "-":
-			arg := Eval(v.Arg, env).(Integer)
+			arg := Eval(v.Arg).(Integer)
 			return Integer(-arg)
 		case "!":
-			arg := Eval(v.Arg, env).(Boolean)
+			arg := Eval(v.Arg).(Boolean)
 			return Boolean(!arg)
 		case "$":
-			i := Eval(v.Arg, env).(Integer)
+			i := Eval(v.Arg).(Integer)
 			s := ""
 			for i != 0 {
 				d := i % 94
@@ -220,7 +218,7 @@ func Eval(expr Expr, env map[int]Expr) Expr {
 			}
 			return String(s)
 		case "#":
-			s := Eval(v.Arg, env).(String)
+			s := Eval(v.Arg).(String)
 			i := 0
 			for _, c := range s {
 				i = i*94 + int(strings.Index(lookup, string(c)))
@@ -230,13 +228,11 @@ func Eval(expr Expr, env map[int]Expr) Expr {
 			panic(fmt.Sprintf("Unknown unop: %s", v.Op))
 		}
 	case Lambda:
-		return Lambda{v.Param, v.Body, env}
+		return Lambda{v.Param, v.Body}
 	case Var:
-		x, ok := env[int(v.v)]
-		if !ok {
-			panic(fmt.Sprintf("Variable %d not found", v))
-		}
-		return Eval(x, env)
+		// Note: This should have been substituted in a beta reduction
+		// before trying to evaluate if it was in scope.
+		panic(fmt.Sprintf("Variable %d not found", v))
 	default:
 		panic(fmt.Sprintf("Unknown type: %T", expr))
 	}
@@ -256,7 +252,7 @@ func Substitute(expr Expr, v int64, val Expr) Expr {
 		if e.Param == v {
 			return e
 		}
-		return Lambda{e.Param, Substitute(e.Body, v, val), e.Env}
+		return Lambda{e.Param, Substitute(e.Body, v, val)}
 	case Var:
 		if e.v == v {
 			return val
