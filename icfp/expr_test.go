@@ -1,6 +1,7 @@
 package icfp
 
 import (
+	"math/big"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,5 +13,5 @@ func TestEfficiency1(t *testing.T) {
 	expr, rest := CombineToExpr(exprs)
 	assert.Empty(t, rest)
 	res := Eval(expr)
-	assert.Equal(t, Integer(17592186044416), res)
+	assert.Equal(t, Integer{Int: big.NewInt(17592186044416)}, res)
 }
