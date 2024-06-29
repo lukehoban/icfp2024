@@ -30,7 +30,6 @@ func main() {
 		fmt.Printf("WARNING - didn't use all input! %v\n", rest)
 	}
 
-	fmt.Printf("expr %v\n", expr)
 	res := icfp.Eval(expr)
 	fmt.Printf("%v", res)
 }

@@ -22,7 +22,6 @@ func CommunicateToken(s string) ([]Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	fmt.Printf("received %v\n", string(byts))
 	expr := Parse(string(byts))
 	return expr, nil
 }

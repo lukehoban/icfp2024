@@ -128,6 +128,34 @@ func CombineToExpr(exprs []Expr) (Expr, []Expr) {
 	}
 }
 
+var cache map[Expr]map[Expr]Expr
+
+func readCache(key1 Expr, key2 Expr) (Expr, bool) {
+	if cache == nil {
+		return nil, false
+	}
+	if _, ok := cache[key1]; !ok {
+		return nil, false
+	}
+	if val, ok := cache[key1][key2]; ok {
+		if val == nil {
+			return nil, false
+		}
+		return val, true
+	}
+	return nil, false
+}
+
+func writeCache(key1 Expr, key2 Expr, val Expr) {
+	if cache == nil {
+		cache = make(map[Expr]map[Expr]Expr)
+	}
+	if _, ok := cache[key1]; !ok {
+		cache[key1] = make(map[Expr]Expr)
+	}
+	cache[key1][key2] = val
+}
+
 func Eval(expr Expr) Expr {
 	switch v := expr.(type) {
 	case Integer, Boolean, String:
@@ -146,9 +174,16 @@ func Eval(expr Expr) Expr {
 			right := Eval(v.Right)
 			return Boolean(left == right)
 		case "$":
+			// fmt.Printf("Beta-reduction: %v %v\n", v.Left, v.Right)
+			// fmt.Printf(".")
+			if val, ok := readCache(v.Left, v.Right); ok {
+				return val
+			}
 			lambda := Eval(v.Left).(Lambda)
 			reduced := Substitute(lambda.Body, lambda.Param, v.Right)
-			return Eval(reduced)
+			res := Eval(reduced)
+			writeCache(v.Left, v.Right, res)
+			return res
 		case "T":
 			left := Eval(v.Left).(Integer)
 			right := Eval(v.Right).(String)
