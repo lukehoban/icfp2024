@@ -22,7 +22,7 @@ func CommunicateToken(s string) ([]Expr, error) {
 	if err != nil {
 		return nil, err
 	}
-	// fmt.Printf("%s\n\n", byts)
+	fmt.Printf("%s\n\n", byts)
 	expr := Parse(string(byts))
 	return expr, nil
 }

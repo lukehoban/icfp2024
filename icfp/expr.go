@@ -181,11 +181,10 @@ func Eval(expr Expr) Expr {
 			}
 			return Boolean(left == right)
 		case "$":
-			// fmt.Printf("Beta-reduction: %v %v\n", v.Left, v.Right)
-			// fmt.Printf(".")
 			if val, ok := readCache(v.Left, v.Right); ok {
 				return val
 			}
+			fmt.Printf("Beta-reduction: %v %v\n", v.Left, v.Right)
 			lambda := Eval(v.Left).(Lambda)
 			reduced := Substitute(lambda.Body, lambda.Param, v.Right)
 			res := Eval(reduced)
@@ -233,8 +232,11 @@ func Eval(expr Expr) Expr {
 			z := big.NewInt(0).Quo(left.Int, right.Int)
 			return Integer{Int: z}
 		case "*":
-			left := Eval(v.Left).(Integer)
 			right := Eval(v.Right).(Integer)
+			if right.Cmp(big.NewInt(0)) == 0 {
+				return Integer{Int: big.NewInt(0)}
+			}
+			left := Eval(v.Left).(Integer)
 			z := big.NewInt(0).Mul(left.Int, right.Int)
 			return Integer{Int: z}
 		case "+":
@@ -346,8 +348,17 @@ func RenderAsLambda(e Expr) string {
 	case Unop:
 		return fmt.Sprintf("(%s %s)", v.Op, RenderAsLambda(v.Arg))
 	case Lambda:
-		return fmt.Sprintf("(λ%s.%s)", varLookup[v.Param], RenderAsLambda(v.Body))
+		var s string
+		if v.Param >= int64(len(varLookup)) {
+			s = fmt.Sprintf("v%d", v.Param)
+		} else {
+			s = varLookup[v.Param]
+		}
+		return fmt.Sprintf("(λ%s.%s)", s, RenderAsLambda(v.Body))
 	case Var:
+		if v.v >= int64(len(varLookup)) {
+			return fmt.Sprintf("v%d", v.v)
+		}
 		return varLookup[v.v]
 	default:
 		panic(fmt.Sprintf("Unknown type: %T", e))
