@@ -33,6 +33,6 @@ func main() {
 	fmt.Printf("%v\n\n", expr)
 	fmt.Printf("%v\n\n", icfp.RenderAsLambda(expr))
 
-	res := icfp.Eval(expr)
+	res := icfp.Eval(expr, nil)
 	fmt.Printf("%v", res)
 }

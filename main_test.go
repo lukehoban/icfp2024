@@ -21,6 +21,6 @@ func TestFirstMessage(t *testing.T) {
 
 	assert.Empty(t, rest)
 
-	res := icfp.Eval(expr)
+	res := icfp.Eval(expr, nil)
 	fmt.Printf("Res: %v\n", res)
 }

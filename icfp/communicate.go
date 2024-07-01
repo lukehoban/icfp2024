@@ -37,7 +37,7 @@ func CommunicateString(s string) (string, error) {
 	if len(rest) > 0 {
 		return "", fmt.Errorf("didn't use all input! %v", rest)
 	}
-	res := Eval(expr)
+	res := Eval(expr, nil)
 	out, ok := res.(String)
 	if !ok {
 		return "", fmt.Errorf("expected string, got %T", res)

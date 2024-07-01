@@ -32,6 +32,7 @@ type If struct {
 type Lambda struct {
 	Param int64
 	Body  Expr
+	Env   Env
 }
 type Var struct {
 	v int64
@@ -130,139 +131,116 @@ func CombineToExpr(exprs []Expr) (Expr, []Expr) {
 	}
 }
 
-var cache map[Expr]map[Expr]Expr
-
-func readCache(key1 Expr, key2 Expr) (Expr, bool) {
-	if cache == nil {
-		return nil, false
-	}
-	if _, ok := cache[key1]; !ok {
-		return nil, false
-	}
-	if val, ok := cache[key1][key2]; ok {
-		if val == nil {
-			return nil, false
-		}
-		return val, true
-	}
-	return nil, false
+type Thunk struct {
+	Expr      Expr
+	Env       Env
+	Value     Expr
+	Evaluated bool
 }
 
-func writeCache(key1 Expr, key2 Expr, val Expr) {
-	if cache == nil {
-		cache = make(map[Expr]map[Expr]Expr)
+type Env map[int64]*Thunk
+
+func copyEnv(e Env) Env {
+	newEnv := make(Env)
+	for k, v := range e {
+		newEnv[k] = v
 	}
-	if _, ok := cache[key1]; !ok {
-		cache[key1] = make(map[Expr]Expr)
-	}
-	cache[key1][key2] = val
+	return newEnv
 }
 
-func Eval(expr Expr) Expr {
+func Eval(expr Expr, env Env) Expr {
+	fmt.Printf(".")
 	switch v := expr.(type) {
 	case Integer, Boolean, String:
 		return v
-	case If:
-		test := Eval(v.Test).(Boolean)
-		if test {
-			return Eval(v.Then)
-		} else {
-			return Eval(v.Else)
+	case Lambda:
+		return Lambda{Param: v.Param, Body: v.Body, Env: copyEnv(env)}
+	case Var:
+		thunk, ok := env[v.v]
+		if !ok {
+			panic(fmt.Sprintf("Unknown variable: %d", v.v))
 		}
+		if !thunk.Evaluated {
+			// fmt.Printf("Evaluating thunk: %s with env %v\n", RenderAsLambda(thunk.Expr), thunk.Env)
+			thunk.Value = Eval(thunk.Expr, thunk.Env)
+			thunk.Evaluated = true
+		}
+		return thunk.Value
 	case Binop:
+		var left, right Expr
+		if v.Op != "$" {
+			left = Eval(v.Left, env)
+			right = Eval(v.Right, env)
+		}
 		switch v.Op {
+		case "$":
+			// fmt.Printf("Beta-reducing: %s with env %v\n", RenderAsLambda(v), env)
+			lambda := Eval(v.Left, env).(Lambda)
+			// fmt.Printf("Creating thunk for arg: %s with env %v\n", RenderAsLambda(v.Right), env)
+			argThunk := &Thunk{
+				Expr:      v.Right,
+				Env:       env,
+				Value:     nil,
+				Evaluated: false,
+			}
+			newEnv := copyEnv(lambda.Env)
+			newEnv[lambda.Param] = argThunk
+			// fmt.Printf("Calling lambda: %s with env %v\n", RenderAsLambda(lambda.Body), newEnv)
+			return Eval(lambda.Body, newEnv)
 		case "=":
-			left := Eval(v.Left)
-			right := Eval(v.Right)
 			i, oki := left.(Integer)
 			j, okj := right.(Integer)
 			if oki && okj {
 				return Boolean(i.Cmp(j.Int) == 0)
 			}
 			return Boolean(left == right)
-		case "$":
-			if val, ok := readCache(v.Left, v.Right); ok {
-				return val
-			}
-			fmt.Printf("Beta-reduction: %v %v\n", v.Left, v.Right)
-			lambda := Eval(v.Left).(Lambda)
-			reduced := Substitute(lambda.Body, lambda.Param, v.Right)
-			res := Eval(reduced)
-			writeCache(v.Left, v.Right, res)
-			return res
 		case "T":
-			left := Eval(v.Left).(Integer)
-			right := Eval(v.Right).(String)
-			return right[0:left.Int64()]
+			return right.(String)[0:left.(Integer).Int64()]
 		case "D":
-			left := Eval(v.Left).(Integer)
-			right := Eval(v.Right).(String)
-			return right[left.Int64():]
+			return right.(String)[left.(Integer).Int64():]
 		case ".":
-			left := Eval(v.Left).(String)
-			right := Eval(v.Right).(String)
-			return left + right
+			return left.(String) + right.(String)
 		case "&":
-			left := Eval(v.Left).(Boolean)
-			right := Eval(v.Right).(Boolean)
-			return Boolean(bool(left) && bool(right))
+			return Boolean(bool(left.(Boolean)) && bool(right.(Boolean)))
 		case "|":
-			left := Eval(v.Left).(Boolean)
-			right := Eval(v.Right).(Boolean)
-			return Boolean(bool(left) || bool(right))
+			return Boolean(bool(left.(Boolean)) || bool(right.(Boolean)))
 		case "<":
-			left := Eval(v.Left).(Integer)
-			right := Eval(v.Right).(Integer)
-			cmp := left.Cmp(right.Int)
+			cmp := left.(Integer).Cmp(right.(Integer).Int)
 			return Boolean(cmp == -1)
 		case ">":
-			left := Eval(v.Left).(Integer)
-			right := Eval(v.Right).(Integer)
-			cmp := left.Cmp(right.Int)
+			cmp := left.(Integer).Cmp(right.(Integer).Int)
 			return Boolean(cmp == 1)
 		case "%":
-			left := Eval(v.Left).(Integer)
-			right := Eval(v.Right).(Integer)
-
-			z := big.NewInt(0).Rem(left.Int, right.Int)
+			z := big.NewInt(0).Rem(left.(Integer).Int, right.(Integer).Int)
 			return Integer{Int: z}
 		case "/":
-			left := Eval(v.Left).(Integer)
-			right := Eval(v.Right).(Integer)
-			z := big.NewInt(0).Quo(left.Int, right.Int)
+			z := big.NewInt(0).Quo(left.(Integer).Int, right.(Integer).Int)
 			return Integer{Int: z}
 		case "*":
-			right := Eval(v.Right).(Integer)
-			if right.Cmp(big.NewInt(0)) == 0 {
+			if right.(Integer).Cmp(big.NewInt(0)) == 0 {
 				return Integer{Int: big.NewInt(0)}
 			}
-			left := Eval(v.Left).(Integer)
-			z := big.NewInt(0).Mul(left.Int, right.Int)
+			z := big.NewInt(0).Mul(left.(Integer).Int, right.(Integer).Int)
 			return Integer{Int: z}
 		case "+":
-			left := Eval(v.Left).(Integer)
-			right := Eval(v.Right).(Integer)
-			z := big.NewInt(0).Add(left.Int, right.Int)
+			z := big.NewInt(0).Add(left.(Integer).Int, right.(Integer).Int)
 			return Integer{Int: z}
 		case "-":
-			left := Eval(v.Left).(Integer)
-			right := Eval(v.Right).(Integer)
-			z := big.NewInt(0).Sub(left.Int, right.Int)
+			z := big.NewInt(0).Sub(left.(Integer).Int, right.(Integer).Int)
 			return Integer{Int: z}
 		default:
 			panic(fmt.Sprintf("Unknown binop: %s", v.Op))
 		}
 	case Unop:
+		arg := Eval(v.Arg, env)
 		switch v.Op {
 		case "-":
-			arg := Eval(v.Arg).(Integer)
-			z := big.NewInt(0).Neg(arg.Int)
+			z := big.NewInt(0).Neg(arg.(Integer).Int)
 			return Integer{Int: z}
 		case "!":
-			arg := Eval(v.Arg).(Boolean)
-			return Boolean(!arg)
+			return Boolean(!arg.(Boolean))
 		case "$":
-			i := Eval(v.Arg).(Integer)
+			i := arg.(Integer)
 			s := ""
 			for i.Cmp(big.NewInt(0)) != 0 {
 				d := big.NewInt(0).Mod(i.Int, big.NewInt(94))
@@ -271,7 +249,7 @@ func Eval(expr Expr) Expr {
 			}
 			return String(s)
 		case "#":
-			s := Eval(v.Arg).(String)
+			s := arg.(String)
 			i := big.NewInt(0)
 			for _, c := range s {
 				i.Mul(i, big.NewInt(94))
@@ -281,40 +259,13 @@ func Eval(expr Expr) Expr {
 		default:
 			panic(fmt.Sprintf("Unknown unop: %s", v.Op))
 		}
-	case Lambda:
-		return Lambda{v.Param, v.Body}
-	case Var:
-		// Note: This should have been substituted in a beta reduction
-		// before trying to evaluate if it was in scope.
-		panic(fmt.Sprintf("Variable %d not found", v))
-	default:
-		panic(fmt.Sprintf("Unknown type: %T", expr))
-	}
-}
-
-func Substitute(expr Expr, v int64, val Expr) Expr {
-	switch e := expr.(type) {
-	case Integer, Boolean, String:
-		return e
 	case If:
-		return If{Substitute(e.Test, v, val), Substitute(e.Then, v, val), Substitute(e.Else, v, val)}
-	case Binop:
-		return Binop{e.Op, Substitute(e.Left, v, val), Substitute(e.Right, v, val)}
-	case Unop:
-		return Unop{e.Op, Substitute(e.Arg, v, val)}
-	case Lambda:
-		if e.Param == v {
-			return e
+		test := Eval(v.Test, env).(Boolean)
+		if test {
+			return Eval(v.Then, env)
+		} else {
+			return Eval(v.Else, env)
 		}
-		// if e.Param.Cmp(v) == 0 {
-		// 	return e
-		// }
-		return Lambda{e.Param, Substitute(e.Body, v, val)}
-	case Var:
-		if e.v == v {
-			return val
-		}
-		return e
 	default:
 		panic(fmt.Sprintf("Unknown type: %T", expr))
 	}
@@ -364,9 +315,3 @@ func RenderAsLambda(e Expr) string {
 		panic(fmt.Sprintf("Unknown type: %T", e))
 	}
 }
-
-// (((λy.((λz.(y (z z))) (λz.(y (z z))))) (λy.(λz.(if (= z 0) "[" (. (y (/ z 39)) (T 1 (D (% z 39) "[t=1, x6y]\n.0S^2>v+/-345Crashed:TickLmE"))))))) 6501638242769916696)
-
-// Y = (λy.((λz.(y (z z))) (λz.(y (z z)))))
-// f = (λy.(λz.(if (= z 0) "[" (. (y (/ z 39)) (T 1 (D (% z 39) "[t=1, x6y]\n.0S^2>v+/-345Crashed:TickLmE"))))))
-// ((Y f) 6501638242769916696)

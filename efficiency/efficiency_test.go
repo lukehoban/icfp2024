@@ -18,5 +18,4 @@ func TestEfficiency3(t *testing.T) {
 	}
 	res := f(9345873499) + 1
 	assert.Equal(t, res, 1)
-
 }
